@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+.github/workflows/*.yml
+
+# Documentation
+*.md
+docs/
+README*
+CHANGELOG*
+LICENSE
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+dist/
+build/
+bin/
+
+# Test files
+*_test.go
+*.test
+coverage.txt
+coverage.html
+.nyc_output
+
+# Dependencies
+node_modules/
+vendor/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker artifacts
+.dockerignore

@@ -1,3 +1,6 @@
+# Build argument for version
+ARG VERSION=dev
+
 FROM node:20 as builder
 
 WORKDIR /build
@@ -13,9 +16,15 @@ RUN DISABLE_ESLINT_PLUGIN='true' VITE_APP_VERSION=$(cat VERSION) npm run build
 
 FROM golang:1.24.2 AS builder2
 
+# Build arguments
+ARG VERSION
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
 ENV GO111MODULE=on \
     CGO_ENABLED=1 \
-    GOOS=linux \
+    GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
     GOPROXY=https://proxy.golang.org,direct
 
 WORKDIR /build
@@ -23,9 +32,12 @@ ADD go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=builder /build/build ./web/build
-RUN go build -ldflags "-s -w -X 'done-hub/common.Version=$(cat VERSION)' -extldflags '-static'" -o done-hub
+RUN go build -ldflags "-s -w -X 'done-hub/common.Version=${VERSION}' -extldflags '-static'" -o done-hub
 
 FROM alpine:latest
+
+# Add build arguments to final stage
+ARG VERSION
 
 RUN apk update && \
     apk upgrade && \
@@ -33,6 +45,12 @@ RUN apk update && \
     update-ca-certificates 2>/dev/null || true
 
 COPY --from=builder2 /build/done-hub /
+
+# Add version label
+LABEL version=${VERSION}
+LABEL maintainer="done-hub"
+LABEL description="Done Hub with MCP tools including enhancetool"
+
 EXPOSE 3000
 WORKDIR /data
 ENTRYPOINT ["/done-hub"]

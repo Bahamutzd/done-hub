@@ -6,6 +6,7 @@ import (
 	"done-hub/mcp/tools/calculator"
 	"done-hub/mcp/tools/current_time"
 	"done-hub/mcp/tools/dashboard"
+	"done-hub/mcp/tools/enhancetool"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
@@ -21,4 +22,5 @@ func init() {
 	McpTools[available_model.NAME] = &available_model.AvailableModel{}
 	McpTools[dashboard.NAME] = &dashboard.Dashboard{}
 	McpTools[current_time.NAME] = &current_time.CurrentTime{}
+	McpTools[enhancetool.NAME] = &enhancetool.EnhanceTool{}
 }

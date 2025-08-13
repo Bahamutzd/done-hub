@@ -1,0 +1,115 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Read version from VERSION file
+      id: version
+      run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Generate image artifact
+      if: github.event_name == 'pull_request'
+      run: |
+        mkdir -p artifacts
+        echo "Image built successfully for PR validation"
+        echo "Tags: ${{ steps.meta.outputs.tags }}"
+        echo "Digest: ${{ steps.build.outputs.digest }}"
+        echo "Image info:" > artifacts/image-info.txt
+        echo "Tags: ${{ steps.meta.outputs.tags }}" >> artifacts/image-info.txt
+        echo "Digest: ${{ steps.build.outputs.digest }}" >> artifacts/image-info.txt
+
+    - name: Upload artifact
+      if: github.event_name == 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-image-info
+        path: artifacts/
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        body: |
+          ## Docker Image
+          
+          Image: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}`
+          
+          Multi-arch support: `linux/amd64`, `linux/arm64`
+          
+          ### Changelog
+          Changes in this release can be found in the [commit history](${{ github.event.compare }})
+        files: |
+          artifacts/image-info.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Output summary
+      run: |
+        echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image**: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tags**: `${{ steps.meta.outputs.tags }}`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platforms**: `linux/amd64, linux/arm64`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Digest**: `${{ steps.build.outputs.digest }}`" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "- **Status**: Built for validation (not pushed)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status**: Pushed to registry" >> $GITHUB_STEP_SUMMARY
+        fi

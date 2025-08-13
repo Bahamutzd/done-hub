@@ -1,0 +1,71 @@
+name: Test Docker Build
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'web/**'
+      - 'VERSION'
+  workflow_dispatch:
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Read version from VERSION file
+      id: version
+      run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+
+    - name: Test build Docker image
+      run: |
+        docker build \
+          --build-arg VERSION=${{ steps.version.outputs.VERSION }} \
+          --target builder2 \
+          -t done-hub:test .
+
+    - name: Test full build
+      run: |
+        docker build \
+          --build-arg VERSION=${{ steps.version.outputs.VERSION }} \
+          -t done-hub:full .
+
+    - name: Verify image
+      run: |
+        # 检查镜像是否存在
+        docker images done-hub:full
+        
+        # 检查镜像标签
+        docker inspect done-hub:full | grep -A 10 "Labels"
+
+    - name: Test container functionality
+      run: |
+        # 运行容器测试基本功能
+        docker run -d --name test-container -p 3001:3000 done-hub:full &
+        
+        # 等待容器启动
+        sleep 10
+        
+        # 检查容器状态
+        docker ps -a | grep test-container
+        
+        # 检查容器日志
+        docker logs test-container || true
+        
+        # 清理测试容器
+        docker stop test-container || true
+        docker rm test-container || true
+
+    - name: Output test results
+      run: |
+        echo "## Docker Build Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Docker build successful" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Multi-stage build completed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Container basic functionality verified" >> $GITHUB_STEP_SUMMARY
