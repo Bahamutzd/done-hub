@@ -32,7 +32,7 @@ ADD go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=builder /build/build ./web/build
-RUN go build -ldflags "-s -w -X 'done-hub/common.Version=${VERSION}' -extldflags '-static'" -o done-hub
+RUN VERSION=$(cat VERSION) && go build -ldflags "-s -w -X 'done-hub/common.Version=${VERSION}' -extldflags '-static'" -o done-hub
 
 FROM alpine:latest
 

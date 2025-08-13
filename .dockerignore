@@ -30,6 +30,7 @@ bin/
 coverage.txt
 coverage.html
 .nyc_output
+test/
 
 # Dependencies
 node_modules/
